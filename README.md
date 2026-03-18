@@ -10,7 +10,8 @@ Start here for the project walkthrough and demo storyline:
 ## Demo Video
 
 Watch the recorded demo here:
-- [demo-clip.mp4](demo-clip.mp4)
+- ## 🎥 Project Demo
+[![Watch the video](https://img.youtube.com/vi/aZuiGAzVEls/maxresdefault.jpg)](https://youtu.be/aZuiGAzVEls)
 
 The repository includes:
 - Training and evaluation pipeline (PyTorch)
