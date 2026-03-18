@@ -1,6 +1,6 @@
 # Speech Emotion Detection + EmoSense AI
 
-End-to-end speech emotion recognition project built on Wav2Vec2 and the RAVDESS dataset.
+End-to-end speech emotion recognition project built on Wav2Vec2 and the RAVDESS, SAVEE and CREMA-D dataset.
 
 ## Project Presentation (PPT)
 
