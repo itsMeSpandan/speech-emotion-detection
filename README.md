@@ -10,7 +10,6 @@ Start here for the project walkthrough and demo storyline:
 ## Demo Video
 
 Watch the recorded demo here:
-- ## 🎥 Project Demo
 [![Watch the video](https://img.youtube.com/vi/aZuiGAzVEls/maxresdefault.jpg)](https://youtu.be/aZuiGAzVEls)
 
 The repository includes:
