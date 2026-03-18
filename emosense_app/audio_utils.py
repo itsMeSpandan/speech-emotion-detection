@@ -39,6 +39,21 @@ def load_audio_from_upload(file_name: str, file_bytes: bytes) -> Tuple[np.ndarra
         return waveform.astype(np.float32), int(sample_rate)
 
 
+def get_audio_metadata(file_bytes: bytes, waveform: np.ndarray, sample_rate: int) -> dict:
+    """Return metadata about the loaded audio file."""
+    duration = len(waveform) / sample_rate
+    file_size_kb = len(file_bytes) / 1024.0
+    
+    # We load as mono, though the original could be stereo.
+    # Returning 'Mono' since that's what the model uses.
+    return {
+        "duration": f"{duration:.1f}s",
+        "sample_rate": f"{sample_rate:,} Hz",
+        "channels": "Mono",
+        "file_size_kb": f"{file_size_kb:.0f} KB"
+    }
+
+
 def waveform_figure(waveform: np.ndarray, sample_rate: int):
     """Build a matplotlib figure for waveform display."""
     fig, ax = plt.subplots(figsize=(8, 2.8))

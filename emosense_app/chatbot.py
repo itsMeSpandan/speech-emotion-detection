@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import os
-import importlib
-from pathlib import Path
 from typing import Dict, List
 
+import streamlit as st
+from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
 
 try:
@@ -19,6 +19,8 @@ except ImportError:
     from sentiment import analyze_sentiment, combine_signals
 
 QWEN_MODEL = "Qwen/Qwen2.5-7B-Instruct"
+
+load_dotenv()
 
 EMOTION_TONE_MAP: Dict[str, str] = {
     "neutral": "friendly and conversational",
@@ -62,65 +64,36 @@ def _build_system_prompt(
     )
 
 
-def _resolve_hf_token() -> str:
-    """Resolve Hugging Face token in strict priority order."""
-    # 1) Environment variable
-    env_token = os.environ.get("HF_TOKEN", "").strip()
-    if env_token:
-        return env_token
+def get_hf_token() -> str:
+    # Priority 1: environment variable
+    token = os.environ.get("HF_TOKEN")
+    if token:
+        return token
 
-    # 2) Streamlit secrets
+    # Priority 2: Streamlit secrets (secrets.toml or cloud secrets)
     try:
-        import streamlit as st
-
-        secret_token = str(st.secrets.get("HF_TOKEN", "")).strip()
-        if secret_token:
-            return secret_token
-    except Exception:
+        token = st.secrets["HF_TOKEN"]
+        if token:
+            return token
+    except (KeyError, FileNotFoundError):
         pass
 
-    # 3) .env fallback via python-dotenv
-    project_root = Path(__file__).resolve().parent.parent
-    dotenv_path = project_root / ".env"
+    # Priority 3: .env file (already loaded above)
+    token = os.getenv("HF_TOKEN")
+    if token:
+        return token
 
-    try:
-        dotenv_module = importlib.import_module("dotenv")
-        load_dotenv = getattr(dotenv_module, "load_dotenv")
-
-        load_dotenv(dotenv_path=dotenv_path, override=False)
-        dotenv_token = os.environ.get("HF_TOKEN", "").strip()
-        if dotenv_token:
-            return dotenv_token
-    except Exception:
-        # Minimal fallback parser when python-dotenv is unavailable.
-        if dotenv_path.exists():
-            try:
-                for raw_line in dotenv_path.read_text(encoding="utf-8").splitlines():
-                    line = raw_line.strip()
-                    if not line or line.startswith("#") or "=" not in line:
-                        continue
-                    key, value = line.split("=", 1)
-                    if key.strip() != "HF_TOKEN":
-                        continue
-                    cleaned = value.strip().strip('"').strip("'")
-                    if cleaned:
-                        return cleaned
-            except Exception:
-                pass
-
-    return ""
+    raise ValueError(
+        "HF_TOKEN not found. Add it to:\n"
+        "  - .streamlit/secrets.toml  as:  HF_TOKEN = 'hf_xxx'\n"
+        "  - OR .env file             as:  HF_TOKEN=hf_xxx\n"
+        "  - OR run: export HF_TOKEN=hf_xxx before streamlit run"
+    )
 
 
 def _build_client() -> InferenceClient:
     """Build a Hugging Face inference client using the environment token."""
-    token = _resolve_hf_token()
-    if not token:
-        raise RuntimeError(
-            "Hugging Face token not found. Configure one of these:\n"
-            "1) Environment variable: HF_TOKEN\n"
-            "2) Streamlit secrets: .streamlit/secrets.toml with HF_TOKEN\n"
-            "3) Project .env file: HF_TOKEN=your_huggingface_token_here"
-        )
+    token = get_hf_token()
     return InferenceClient(model=QWEN_MODEL, token=token)
 
 
