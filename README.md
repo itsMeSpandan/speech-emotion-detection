@@ -312,5 +312,24 @@ python main.py --data_dir "<ravdess_root_path>"
 
 ## License and Dataset Usage
 
-Use this repository according to the licenses of all included dependencies and datasets.
-RAVDESS has its own usage terms and citation requirements.
+### Software License
+
+No explicit open-source license file is currently included in this repository.
+Until a license is added, treat the source code as all rights reserved by the contributors.
+
+If you plan to publish, fork commercially, or redistribute this project, add a clear license first (for example, MIT, Apache-2.0, or GPL-3.0) and ensure all contributors agree.
+
+### Dataset Usage Terms
+
+This project may use external speech-emotion datasets such as RAVDESS, CREMA-D, and SAVEE for research and model development.
+
+Before using or redistributing derived models/data artifacts:
+- Review and comply with each dataset's official license and terms of use.
+- Follow attribution/citation requirements from the dataset providers.
+- Respect any restrictions related to commercial use, redistribution, or derivative works.
+
+### Responsible Use
+
+- Do not assume this system provides clinical diagnosis or medical advice.
+- Validate model behavior across accents, genders, and recording conditions before deployment.
+- Avoid using emotion predictions as the sole signal for high-stakes decisions.
