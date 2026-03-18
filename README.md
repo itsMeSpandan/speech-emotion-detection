@@ -7,6 +7,11 @@ End-to-end speech emotion recognition project built on Wav2Vec2 and the RAVDESS 
 Start here for the project walkthrough and demo storyline:
 - [EmoSense AI Pitch Deck](emosenseAI-BYTECLUB.pptx)
 
+## Demo Video
+
+Watch the recorded demo here:
+- [demo-clip.mp4](demo-clip.mp4)
+
 The repository includes:
 - Training and evaluation pipeline (PyTorch)
 - Inference utilities for checkpoint-based prediction
