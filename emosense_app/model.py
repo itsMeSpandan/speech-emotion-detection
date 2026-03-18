@@ -28,7 +28,7 @@ MODEL_NAME = "facebook/wav2vec2-base"
 TARGET_SR = 16_000
 FIXED_SECONDS = 3
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-MODEL_PATH = PROJECT_ROOT / "outputs" / "model.pth"
+MODEL_PATH = PROJECT_ROOT / "outputs" / "pytorch_model.bin"
 
 
 class Wav2Vec2EmotionClassifier(nn.Module):
@@ -39,16 +39,20 @@ class Wav2Vec2EmotionClassifier(nn.Module):
         num_classes: int,
         model_name: str = MODEL_NAME,
         dropout: float = 0.3,
+        use_mlp_head: bool = True,
     ) -> None:
         """Initialize backbone and classifier layers."""
         super().__init__()
         self.wav2vec2 = Wav2Vec2Model.from_pretrained(model_name)
-        self.classifier = nn.Sequential(
-            nn.Linear(768, 256),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(256, num_classes),
-        )
+        if use_mlp_head:
+            self.classifier = nn.Sequential(
+                nn.Linear(768, 256),
+                nn.ReLU(),
+                nn.Dropout(dropout),
+                nn.Linear(256, num_classes),
+            )
+        else:
+            self.classifier = nn.Linear(768, num_classes)
 
     def forward(self, input_values: torch.Tensor) -> torch.Tensor:
         """Run forward pass and return logits."""
@@ -94,7 +98,7 @@ def _prepare_waveform(waveform: np.ndarray, sample_rate: int) -> np.ndarray:
 
 
 def load_predictor(model_path: str | Path = MODEL_PATH) -> PredictorBundle:
-    """Load model checkpoint from outputs/model.pth, with a safe mock fallback."""
+    """Load model checkpoint with support for wrapped or raw state_dict formats."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     checkpoint_path = Path(model_path)
 
@@ -103,12 +107,40 @@ def load_predictor(model_path: str | Path = MODEL_PATH) -> PredictorBundle:
             raise FileNotFoundError(f"Checkpoint not found at {checkpoint_path}")
 
         checkpoint = torch.load(checkpoint_path, map_location=device)
-        label2id = checkpoint.get("label2id", {v: k for k, v in _build_default_label_map().items()})
+        default_label2id = {v: k for k, v in _build_default_label_map().items()}
+
+        if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+            state_dict = checkpoint["model_state_dict"]
+            label2id = checkpoint.get("label2id", default_label2id)
+        elif isinstance(checkpoint, dict):
+            # Hugging Face style or raw torch.save(model.state_dict()) format.
+            state_dict = checkpoint
+            label2id = default_label2id
+        else:
+            raise ValueError("Unsupported checkpoint format: expected a dictionary")
+
+        use_mlp_head = "classifier.3.weight" in state_dict
+
+        num_classes = len(label2id)
+        head_weight_key = "classifier.3.weight" if use_mlp_head else "classifier.weight"
+        if head_weight_key in state_dict and getattr(state_dict[head_weight_key], "shape", None):
+            num_classes = int(state_dict[head_weight_key].shape[0])
+
         id2label = {idx: label for label, idx in label2id.items()}
+        if len(id2label) != num_classes:
+            default_map = _build_default_label_map()
+            if num_classes == len(default_map):
+                id2label = default_map
+            else:
+                id2label = {idx: f"class_{idx}" for idx in range(num_classes)}
 
         processor = Wav2Vec2Processor.from_pretrained(MODEL_NAME)
-        model = Wav2Vec2EmotionClassifier(num_classes=len(label2id), model_name=MODEL_NAME)
-        model.load_state_dict(checkpoint["model_state_dict"])
+        model = Wav2Vec2EmotionClassifier(
+            num_classes=num_classes,
+            model_name=MODEL_NAME,
+            use_mlp_head=use_mlp_head,
+        )
+        model.load_state_dict(state_dict, strict=True)
         model.to(device)
         model.eval()
 

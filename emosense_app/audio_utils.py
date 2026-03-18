@@ -16,8 +16,11 @@ import soundfile as sf
 def load_audio_from_upload(file_name: str, file_bytes: bytes) -> Tuple[np.ndarray, int]:
     """Decode uploaded audio bytes into mono waveform and sample rate."""
     suffix = Path(file_name).suffix.lower()
-    if suffix not in {".wav", ".mp3", ".ogg"}:
-        raise ValueError("Unsupported format. Upload .wav, .mp3, or .ogg.")
+    # Browser microphone capture may provide non-standard extensions.
+    # We allow common uploads directly and still attempt decode for unknown suffixes.
+    known_suffixes = {".wav", ".mp3", ".ogg", ".webm", ".m4a", ".aac"}
+    if suffix and suffix not in known_suffixes:
+        raise ValueError("Unsupported format. Upload .wav, .mp3, .ogg, .webm, or .m4a.")
 
     buffer = io.BytesIO(file_bytes)
 

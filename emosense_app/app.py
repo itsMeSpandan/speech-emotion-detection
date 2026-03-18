@@ -13,6 +13,8 @@ from audio_utils import load_audio_from_upload, waveform_figure
 from model import EMOTION_EMOJI, MODEL_PATH, load_predictor, predict_distribution, top_prediction
 from report import build_mood_report, report_as_json, report_as_text
 
+MODEL_PATH_DISPLAY = MODEL_PATH.name
+
 st.set_page_config(page_title="EmoSense AI", page_icon="🎙️", layout="wide")
 
 st.markdown(
@@ -39,15 +41,6 @@ st.markdown(
         box-shadow: 0 6px 24px rgba(0,0,0,0.25);
     }
 
-    .nav-wrap {
-        margin-top: 8px;
-        margin-bottom: 10px;
-        padding: 10px;
-        border-radius: 12px;
-        background: linear-gradient(90deg, rgba(23,32,68,0.92), rgba(38,23,79,0.92));
-        border: 1px solid rgba(128, 160, 255, 0.25);
-    }
-
     .panel {
         border-radius: 16px;
         padding: 14px;
@@ -60,7 +53,7 @@ st.markdown(
         font-size: 2rem;
         font-weight: 700;
         text-align: center;
-        margin-top: -10px;
+        margin-top: -6px;
     }
 
     .result-emoji {
@@ -90,20 +83,27 @@ st.markdown(
         font-weight: 600;
         font-size: 0.85rem;
     }
+
+    .soft-note {
+        font-size: 0.9rem;
+        opacity: 0.85;
+        margin-top: 4px;
+    }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
 st.markdown('<div class="app-title">🤖 EmoSense AI <span style="opacity:0.8;font-weight:500;">Speech Emotion Detection</span></div>', unsafe_allow_html=True)
-st.markdown('<div class="nav-wrap"></div>', unsafe_allow_html=True)
 
-page = st.radio(
-    "Navigation",
-    options=["Home", "Dashboard", "About"],
-    horizontal=True,
-    label_visibility="collapsed",
-)
+with st.sidebar:
+    st.markdown("### Navigation")
+    page = st.selectbox(
+        "Go to",
+        options=["Dashboard", "Home", "About"],
+        index=0,
+        label_visibility="collapsed",
+    )
 
 
 @st.cache_resource
@@ -116,31 +116,6 @@ def get_predictor_bundle():
 def make_report_downloads(payload: Dict[str, object]) -> tuple[str, str]:
     """Cache report serialization to avoid recomputing unchanged payloads."""
     return report_as_json(payload), report_as_text(payload)
-
-
-def confidence_color(confidence: float) -> str:
-    """Return UI color based on confidence thresholds."""
-    if confidence > 0.75:
-        return "#22c55e"
-    if confidence > 0.45:
-        return "#f59e0b"
-    return "#ef4444"
-
-
-def draw_confidence_meter(confidence: float) -> None:
-    """Render a custom horizontal confidence meter."""
-    pct = max(0, min(100, int(confidence * 100)))
-    color = confidence_color(confidence)
-    st.markdown(
-        f"""
-        <div style="margin-top:10px; margin-bottom:4px; font-weight:600;">Emotion Confidence Meter ({pct}%)</div>
-        <div style="width:100%; height:16px; border-radius:999px; background:rgba(255,255,255,0.15); overflow:hidden; border:1px solid rgba(255,255,255,0.15);">
-            <div style="width:{pct}%; height:100%; background:{color}; transition: width 0.5s ease;"></div>
-        </div>
-        <div style="display:flex; justify-content:space-between; font-size:0.8rem; opacity:0.8; margin-top:3px;"><span>0%</span><span>100%</span></div>
-        """,
-        unsafe_allow_html=True,
-    )
 
 
 def distribution_chart(conf: Dict[str, float], predicted_label: str):
@@ -176,11 +151,39 @@ def distribution_chart(conf: Dict[str, float], predicted_label: str):
     return fig
 
 
+def get_recorded_audio() -> tuple[Optional[bytes], str]:
+    """Capture microphone audio and return bytes with a generated filename."""
+    recorded_bytes: Optional[bytes] = None
+    recorded_name = f"recorded_{datetime.now().strftime('%H%M%S')}.wav"
+
+    # Prefer native Streamlit mic capture when available.
+    if hasattr(st, "audio_input"):
+        mic_clip = st.audio_input("Record Voice")
+        if mic_clip is not None:
+            recorded_bytes = mic_clip.getvalue()
+            st.audio(recorded_bytes, format="audio/wav")
+        return recorded_bytes, recorded_name
+
+    # Backward-compatible fallback for older Streamlit versions.
+    try:
+        from audiorecorder import audiorecorder
+
+        recorded_audio = audiorecorder("Start recording", "Stop recording")
+        if len(recorded_audio) > 0:
+            recorded_bytes = recorded_audio.export(format="wav").read()
+            st.audio(recorded_bytes, format="audio/wav")
+        return recorded_bytes, recorded_name
+    except Exception:
+        st.caption("Microphone input is unavailable in this Streamlit version.")
+        st.caption("Install fallback support with: pip install streamlit-audiorecorder")
+        return None, recorded_name
+
+
 if page == "Home":
     st.markdown("### Welcome to EmoSense AI")
     st.markdown(
         "Upload or record speech, run emotion inference, inspect confidence distribution, and export a mood report. "
-        "The app loads the fine-tuned checkpoint from outputs/model.pth by default."
+        f"The app loads the fine-tuned checkpoint from {MODEL_PATH_DISPLAY} by default."
     )
     st.info("Tip: Use the Dashboard tab to analyze audio.")
 
@@ -188,21 +191,25 @@ elif page == "About":
     st.markdown("### About EmoSense AI")
     st.markdown(
         "EmoSense AI is a Streamlit interface for Wav2Vec2-based Speech Emotion Recognition on RAVDESS. "
-        "It supports a strict model path (outputs/model.pth), audio waveform visualization, confidence charts, "
+        f"It supports a strict model path ({MODEL_PATH_DISPLAY}), audio waveform visualization, confidence charts, "
         "and downloadable mood reports."
     )
 
 else:
     st.markdown("### Dashboard")
+    st.markdown(
+        '<div class="soft-note">Tip: Upload or record a short, clear clip (2-6 seconds) for the best prediction quality.</div>',
+        unsafe_allow_html=True,
+    )
 
     predictor = get_predictor_bundle()
     if predictor.is_mock:
         st.error(
-            "Model load failed from outputs/model.pth. "
+            f"Model load failed from {MODEL_PATH_DISPLAY}. "
             f"Running in demo mode with mock predictions. Details: {predictor.error_message}"
         )
     else:
-        st.success("Loaded model checkpoint from outputs/model.pth")
+        st.success(f"Loaded model checkpoint from {MODEL_PATH_DISPLAY}")
 
     left_col, center_col, right_col = st.columns([1.0, 1.05, 1.35], gap="large")
 
@@ -210,23 +217,25 @@ else:
         st.markdown('<div class="panel">', unsafe_allow_html=True)
         st.subheader("Input Section")
 
-        uploaded = st.file_uploader(
-            "Upload Audio File",
-            type=["wav", "mp3", "ogg"],
-            help="Supported formats: .wav, .mp3, .ogg",
+        input_mode = st.radio(
+            "Choose Input Mode",
+            options=["Upload File", "Record Voice"],
+            horizontal=True,
         )
 
-        st.caption("Record Voice (optional)")
+        uploaded = None
         recorded_bytes: Optional[bytes] = None
-        try:
-            from audiorecorder import audiorecorder
+        recorded_name = f"recorded_{datetime.now().strftime('%H%M%S')}.wav"
 
-            recorded_audio = audiorecorder("Start recording", "Stop recording")
-            if len(recorded_audio) > 0:
-                recorded_bytes = recorded_audio.export(format="wav").read()
-                st.audio(recorded_bytes, format="audio/wav")
-        except Exception:
-            st.caption("Install optional package for mic input: pip install streamlit-audiorecorder")
+        if input_mode == "Upload File":
+            uploaded = st.file_uploader(
+                "Upload Audio File",
+                type=["wav", "mp3", "ogg"],
+                help="Supported formats: .wav, .mp3, .ogg",
+            )
+        else:
+            st.caption("Use your microphone to record a short audio clip.")
+            recorded_bytes, recorded_name = get_recorded_audio()
 
         analysis_type = st.selectbox(
             "Analysis Type",
@@ -246,7 +255,7 @@ else:
             file_name = uploaded.name
             audio_bytes = uploaded.getvalue()
         elif recorded_bytes is not None:
-            file_name = f"recorded_{datetime.now().strftime('%H%M%S')}.wav"
+            file_name = recorded_name
             audio_bytes = recorded_bytes
 
         if audio_bytes is None:
@@ -291,8 +300,7 @@ else:
             )
 
             if result["analysis_type"] != "Emotion Only":
-                draw_confidence_meter(conf)
-                st.progress(int(conf * 100))
+                st.metric("Confidence", f"{conf * 100:.1f}%")
 
             if result["analysis_type"] == "Confidence Only":
                 st.caption("Confidence-only mode selected.")
