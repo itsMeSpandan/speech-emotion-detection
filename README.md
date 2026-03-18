@@ -238,6 +238,64 @@ Optional custom paths:
 !python colab_train_wav2vec2.py --download_data --data_dir /content/data --output_dir /content/outputs --epochs 15 --batch_size 16
 ```
 
+## Scalability Details
+
+This project is designed to scale from local experimentation to cloud-hosted inference with predictable performance and manageable cost.
+
+- Data pipeline scalability:
+    - Audio clips are standardized (mono, 16 kHz, fixed duration), which keeps tensor shapes consistent and enables efficient batching.
+    - Dataset and DataLoader split logic is modular, making it straightforward to add larger datasets or multilingual corpora.
+    - Corrupt-file handling and normalization guardrails reduce pipeline failures during large ingestion runs.
+
+- Training scalability:
+    - Wav2Vec2 transfer learning minimizes required labeled data compared to training from scratch.
+    - Class-weighted loss and stratified splits improve stability as class imbalance grows.
+    - The training stack can be extended to mixed precision, gradient accumulation, and distributed training for larger workloads.
+
+- Inference scalability:
+    - Checkpoint-based inference supports offline and real-time deployment patterns.
+    - The app already separates preprocessing, model loading, and reporting, which helps move components into independent services later.
+    - Prediction outputs are compact (label + confidence/probabilities), making them easy to stream to dashboards or downstream APIs.
+
+- Deployment scalability:
+    - Works locally for development and can be containerized for managed platforms.
+    - Streamlit UI can serve as a front door while heavy inference is shifted to a dedicated API service.
+    - Stateless request handling makes horizontal scaling feasible behind a load balancer.
+
+- Operational scalability:
+    - Logging model confidence and class distribution supports drift monitoring and retraining triggers.
+    - Versioned artifacts in outputs can be promoted to model registries in production setups.
+    - Clear module boundaries (training, inference, app, report) simplify team collaboration and maintenance.
+
+## Future Scope
+
+The roadmap focuses on improving accuracy, reliability, and practical impact in real-world mental wellness scenarios.
+
+- Model and data improvements:
+    - Expand beyond RAVDESS with CREMA-D, SAVEE, and additional spontaneous-speech datasets.
+    - Add speaker-robust and noise-robust training through augmentation and domain adaptation.
+    - Evaluate larger SSL backbones and distill them into lightweight deployment models.
+
+- Multimodal intelligence:
+    - Fuse speech emotion with text sentiment and conversational context at the model level.
+    - Add temporal smoothing across utterances for more stable session-level emotion tracking.
+    - Introduce confidence-aware fallback behavior when predictions are uncertain.
+
+- Product and UX evolution:
+    - Build personalized trend timelines, weekly summaries, and intervention suggestions.
+    - Add multilingual UI and multilingual emotion inference support.
+    - Support low-latency streaming inference for near real-time conversational feedback.
+
+- Safety and responsible AI:
+    - Strengthen crisis-response pathways with configurable escalation and local helpline routing.
+    - Add explainability signals (top acoustic cues, confidence calibration) for transparency.
+    - Formalize bias and fairness audits across gender, accent, and recording conditions.
+
+- Platform and MLOps:
+    - Add experiment tracking, model registry integration, and automated evaluation pipelines.
+    - Introduce CI checks for inference regressions and report quality.
+    - Expose a production API layer for web, mobile, and third-party integrations.
+
 ## Troubleshooting
 
 1. No audio files found:
