@@ -594,16 +594,6 @@ with col_right:
             
             if show_contradiction:
                 st.markdown("<div style='margin-top: 16px;' class='banner banner-success'>\u2713 Voice and text signals are aligned.</div>", unsafe_allow_html=True)
-                
-        with st.container():
-            st.markdown("<h4 style='margin-top:0; margin-bottom:8px;'>\U0001F4C4 Export Report</h4>", unsafe_allow_html=True)
-            ec1, ec2 = st.columns(2)
-            dl_data = json.dumps({"emotion": emotion, "confidence": conf, "date": str(datetime.now())})
-            with ec1:
-                st.download_button("\u2B07\uFE0F Download JSON", data=dl_data, file_name="report.json", mime="application/json", use_container_width=True)
-            with ec2:
-                st.download_button("\u2B07\uFE0F Download TXT", data=f"Emotion: {emotion}\nConfidence: {conf}", file_name="report.txt", mime="text/plain", use_container_width=True)
-            st.markdown("<div style='color:#94A3B8; font-size:12px; margin-top:8px;'>Includes waveform data, all confidence scores, and chat log</div>", unsafe_allow_html=True)
 
 st.markdown("""
 <style>
