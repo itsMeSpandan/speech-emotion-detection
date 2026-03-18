@@ -2,6 +2,11 @@
 
 End-to-end speech emotion recognition project built on Wav2Vec2 and the RAVDESS dataset.
 
+## Project Presentation (PPT)
+
+Start here for the project walkthrough and demo storyline:
+- [EmoSense AI Pitch Deck](emosenseAI-BYTECLUB.pptx)
+
 The repository includes:
 - Training and evaluation pipeline (PyTorch)
 - Inference utilities for checkpoint-based prediction
@@ -27,7 +32,7 @@ The repository includes:
 |-- train.py                          # Training loop and checkpointing
 |-- evaluate.py                       # Metrics and plots
 |-- inference.py                      # Inference helpers
-|-- colab_train_wav2vec2_ravdess.py   # Colab script (optional auto download)
+|-- colab_train_wav2vec2.py           # Colab script (optional auto download)
 |-- requirements.txt                  # Root dependencies
 |-- emosense_app/
 |   |-- app.py                        # Streamlit UI
@@ -164,11 +169,11 @@ streamlit run emosense_app/app.py
 
 Features in the app:
 - Upload `.wav`, `.mp3`, `.ogg`
-- Optional mic recording (`streamlit-audiorecorder`)
+- Optional mic recording (`st.audio_input`)
 - Emotion label + confidence meter
 - Distribution chart across all emotions
 - Waveform visualization
-- Downloadable mood report (`.json` / `.txt`)
+- Floating emotion-aware chat window
 
 ## Chatbot Integration
 
@@ -194,18 +199,14 @@ export HF_TOKEN="your_hf_token_here"
 streamlit run emosense_app/app.py
 ```
 
-Chat input modes in the dashboard:
+Chat mode in the dashboard:
 
-- `⌨️ Type`: standard text chat (`st.chat_input`)
-- `🎙️ Speak`: in-chat microphone capture; message is transcribed with Whisper (`openai/whisper-base`) and re-analyzed for emotion
-- `📎 Upload`: in-chat file upload with support for `.wav`, `.mp3`, `.ogg`, `.txt`, `.pdf`, `.png`, `.jpg`, `.jpeg`
+- `⌨️ Type`: floating chat window using `st.chat_input`
 
 Notes:
 
-- Audio uploaded in chat updates the live emotional context.
-- Text and PDF files are summarized with emotional awareness.
-- Image uploads are acknowledged textually (the selected Qwen model here is text-only).
-- Downloaded mood reports include the chat conversation log.
+- Chat responses are conditioned on current voice emotion + confidence.
+- Keep `HF_TOKEN` configured to use Hugging Face inference from the app.
 
 Model behavior:
 - Default checkpoint path is `outputs/model.pth`
@@ -220,19 +221,16 @@ This project combines multimodal affect understanding (voice + text), intent-awa
 - Safety-first crisis interception and helpline-first response path
 - Resource recommendation layer tailored by emotion and intent
 
-For a complete write-up, see:
-- `METHODOLOGY.md`
-
 ## Colab Training
 
 ```python
-!python colab_train_wav2vec2_ravdess.py --download_data
+!python colab_train_wav2vec2.py --download_data
 ```
 
 Optional custom paths:
 
 ```python
-!python colab_train_wav2vec2_ravdess.py --download_data --data_dir /content/data --output_dir /content/outputs --epochs 15 --batch_size 16
+!python colab_train_wav2vec2.py --download_data --data_dir /content/data --output_dir /content/outputs --epochs 15 --batch_size 16
 ```
 
 ## Troubleshooting
