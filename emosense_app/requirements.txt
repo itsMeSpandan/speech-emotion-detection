@@ -1,9 +1,9 @@
 streamlit>=1.30
 plotly>=5.18
 pandas>=2.0
-torch
+torch>=2.0.0
 torchaudio
-transformers
+transformers>=4.40.0
 librosa
 soundfile
 numpy
@@ -12,3 +12,7 @@ matplotlib
 seaborn
 tqdm
 streamlit-audiorecorder
+huggingface_hub>=0.23.0
+PyMuPDF>=1.24.0
+python-dotenv>=1.0.0
+openai-whisper>=20231117

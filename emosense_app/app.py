@@ -1,371 +1,371 @@
-"""EmoSense AI Streamlit app for speech emotion detection."""
+"""Production UI for EmoSense with clean layout and backend placeholders."""
 
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Dict, Optional
 
-import pandas as pd
-import plotly.express as px
 import streamlit as st
 
-from audio_utils import load_audio_from_upload, waveform_figure
+from audio_utils import load_audio_from_upload
 from model import EMOTION_EMOJI, MODEL_PATH, load_predictor, predict_distribution, top_prediction
-from report import build_mood_report, report_as_json, report_as_text
 
 MODEL_PATH_DISPLAY = MODEL_PATH.name
 
-st.set_page_config(page_title="EmoSense AI", page_icon="🎙️", layout="wide")
+
+st.set_page_config(
+    page_title="EmoSense",
+    page_icon="🎙️",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
 st.markdown(
     """
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    [data-testid="stToolbar"] {display: none;}
+
+    :root {
+      --bg-0: #0b1220;
+      --bg-1: #111827;
+      --bg-2: #1f2937;
+      --text-0: #f8fafc;
+      --text-1: #cbd5e1;
+      --accent: #f97316;
+      --accent-soft: rgba(249, 115, 22, 0.18);
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --border: rgba(148, 163, 184, 0.22);
+    }
 
     html, body, [class*="css"] {
-        font-family: 'Poppins', sans-serif;
-        background: radial-gradient(circle at 10% 10%, #1f2a56 0%, #0f1224 55%, #070a17 100%);
-        color: #ecf0ff;
+      background: radial-gradient(circle at 12% 12%, #172036 0%, var(--bg-0) 58%, #060a13 100%);
+      color: var(--text-0);
     }
 
     .app-title {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        font-size: 1.45rem;
-        font-weight: 700;
-        padding: 10px 14px;
-        border-radius: 12px;
-        background: linear-gradient(90deg, rgba(102,126,234,0.35), rgba(118,75,162,0.35));
-        border: 1px solid rgba(180, 200, 255, 0.2);
-        box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+      margin-bottom: 0.65rem;
+      padding: 1rem 1.1rem;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: linear-gradient(120deg, rgba(15,23,42,0.82), rgba(17,24,39,0.92));
+      box-shadow: 0 14px 34px rgba(0,0,0,0.32);
+    }
+
+    .app-title h1 {
+      margin: 0;
+      font-size: 1.45rem;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+
+    .app-title p {
+      margin: 0.35rem 0 0;
+      color: var(--text-1);
+      font-size: 0.93rem;
     }
 
     .panel {
-        border-radius: 16px;
-        padding: 14px;
-        background: linear-gradient(180deg, rgba(18,24,48,0.86), rgba(15,18,34,0.9));
-        border: 1px solid rgba(120, 148, 255, 0.24);
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1rem;
+      background: linear-gradient(180deg, rgba(15,23,42,0.85), rgba(17,24,39,0.9));
+      box-shadow: 0 12px 28px rgba(0,0,0,0.28);
+      height: 100%;
     }
 
-    .result-label {
-        font-size: 2rem;
-        font-weight: 700;
-        text-align: center;
-        margin-top: -6px;
+    .section-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.55rem;
+      color: var(--text-0);
     }
 
-    .result-emoji {
-        font-size: 5rem;
-        text-align: center;
-        line-height: 1;
+    .context-chip {
+      display: inline-block;
+      padding: 0.35rem 0.68rem;
+      border-radius: 999px;
+      border: 1px solid rgba(249,115,22,0.55);
+      background: var(--accent-soft);
+      color: #ffedd5;
+      font-size: 0.82rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
     }
 
-    .badge-ok {
-        display: inline-block;
-        padding: 6px 10px;
-        border-radius: 999px;
-        background: rgba(34, 197, 94, 0.2);
-        border: 1px solid rgba(34, 197, 94, 0.7);
-        color: #86efac;
-        font-weight: 600;
-        font-size: 0.85rem;
+    .chat-wrap {
+      margin-top: 1rem;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1rem;
+      background: linear-gradient(180deg, rgba(17,24,39,0.94), rgba(10,16,30,0.96));
+      box-shadow: 0 10px 30px rgba(0,0,0,0.26);
     }
 
-    .badge-warn {
-        display: inline-block;
-        padding: 6px 10px;
-        border-radius: 999px;
-        background: rgba(245, 158, 11, 0.2);
-        border: 1px solid rgba(245, 158, 11, 0.7);
-        color: #fcd34d;
-        font-weight: 600;
-        font-size: 0.85rem;
+    [data-testid="stMetricValue"] {
+      color: #fb923c;
+      font-weight: 800;
+      letter-spacing: 0.2px;
     }
 
-    .soft-note {
-        font-size: 0.9rem;
-        opacity: 0.85;
-        margin-top: 4px;
+    [data-testid="stMetricLabel"] {
+      color: #cbd5e1;
+      font-weight: 600;
+    }
+
+    [data-testid="stProgressBar"] > div > div {
+      background: linear-gradient(90deg, #fb923c, #ea580c);
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-st.markdown('<div class="app-title">🤖 EmoSense AI <span style="opacity:0.8;font-weight:500;">Speech Emotion Detection</span></div>', unsafe_allow_html=True)
-
-with st.sidebar:
-    st.markdown("### Navigation")
-    page = st.selectbox(
-        "Go to",
-        options=["Dashboard", "Home", "About"],
-        index=0,
-        label_visibility="collapsed",
-    )
-
 
 @st.cache_resource
 def get_predictor_bundle():
-    """Load model resources once per app process."""
+    """Load SER model resources once per process."""
     return load_predictor(MODEL_PATH)
 
 
-@st.cache_data(show_spinner=False)
-def make_report_downloads(payload: Dict[str, object]) -> tuple[str, str]:
-    """Cache report serialization to avoid recomputing unchanged payloads."""
-    return report_as_json(payload), report_as_text(payload)
+def init_state() -> None:
+    """Initialize all production session keys."""
+    st.session_state.setdefault("analysis_result", None)
+    st.session_state.setdefault("current_emotion", "neutral")
+    st.session_state.setdefault("current_confidence", 0.0)
+    st.session_state.setdefault("chat_history", [])
+    st.session_state.setdefault("raw_model_output", {})
+    st.session_state.setdefault("raw_llm_output", {})
+    st.session_state.setdefault("chat_opened", False)
 
 
-def distribution_chart(conf: Dict[str, float], predicted_label: str):
-    """Build horizontal confidence distribution chart."""
-    display_order = ["angry", "neutral", "happy", "sad", "fearful", "disgust", "surprised", "calm"]
-    values = {k: conf.get(k, 0.0) * 100 for k in display_order}
-
-    df = pd.DataFrame(
-        {
-            "Emotion": [e.capitalize() for e in display_order],
-            "Confidence": [values[e] for e in display_order],
-            "Highlight": ["Predicted" if e == predicted_label else "Other" for e in display_order],
-        }
-    )
-
-    fig = px.bar(
-        df,
-        x="Confidence",
-        y="Emotion",
-        orientation="h",
-        text=df["Confidence"].map(lambda x: f"{x:.1f}%"),
-        color="Highlight",
-        color_discrete_map={"Predicted": "#7c3aed", "Other": "#4b5563"},
-        template="plotly_dark",
-        height=360,
-    )
-    fig.update_layout(
-        margin=dict(l=20, r=20, t=10, b=10),
-        xaxis_range=[0, 100],
-        legend_title_text="",
-    )
-    fig.update_traces(textposition="outside")
-    return fig
+def append_chat(role: str, content: str) -> None:
+    """Append a chat message for rendering."""
+    st.session_state["chat_history"].append({
+        "role": role,
+        "content": content,
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+    })
 
 
-def get_recorded_audio() -> tuple[Optional[bytes], str]:
-    """Capture microphone audio and return bytes with a generated filename."""
-    recorded_bytes: Optional[bytes] = None
+def get_recorded_audio(label: str, key: str) -> tuple[Optional[bytes], str]:
+    """Capture microphone audio with Streamlit native input and fallback."""
     recorded_name = f"recorded_{datetime.now().strftime('%H%M%S')}.wav"
 
-    # Prefer native Streamlit mic capture when available.
     if hasattr(st, "audio_input"):
-        mic_clip = st.audio_input("Record Voice")
-        if mic_clip is not None:
-            recorded_bytes = mic_clip.getvalue()
-            st.audio(recorded_bytes, format="audio/wav")
-        return recorded_bytes, recorded_name
+        clip = st.audio_input(label, key=key)
+        if clip is not None:
+            audio_bytes = clip.getvalue()
+            st.audio(audio_bytes, format="audio/wav")
+            return audio_bytes, recorded_name
+        return None, recorded_name
 
-    # Backward-compatible fallback for older Streamlit versions.
     try:
         from audiorecorder import audiorecorder
 
         recorded_audio = audiorecorder("Start recording", "Stop recording")
         if len(recorded_audio) > 0:
-            recorded_bytes = recorded_audio.export(format="wav").read()
-            st.audio(recorded_bytes, format="audio/wav")
-        return recorded_bytes, recorded_name
+            audio_bytes = recorded_audio.export(format="wav").read()
+            st.audio(audio_bytes, format="audio/wav")
+            return audio_bytes, recorded_name
     except Exception:
-        st.caption("Microphone input is unavailable in this Streamlit version.")
-        st.caption("Install fallback support with: pip install streamlit-audiorecorder")
-        return None, recorded_name
+        st.caption("Microphone input unavailable. Install fallback: pip install streamlit-audiorecorder")
+
+    return None, recorded_name
 
 
-if page == "Home":
-    st.markdown("### Welcome to EmoSense AI")
-    st.markdown(
-        "Upload or record speech, run emotion inference, inspect confidence distribution, and export a mood report. "
-        f"The app loads the fine-tuned checkpoint from {MODEL_PATH_DISPLAY} by default."
+def run_emotion_inference(file_name: str, audio_bytes: bytes, predictor) -> Dict[str, object]:
+    """Run model inference and return a compact UI-ready result object."""
+    # [INSERT WAV2VEC INFERENCE HERE]
+    # Replace this block with your own backend pipeline if needed.
+    waveform, sample_rate = load_audio_from_upload(file_name, audio_bytes)
+    conf_dist = predict_distribution(waveform, sample_rate, predictor)
+    pred_label, pred_conf = top_prediction(conf_dist)
+
+    raw_payload = {
+        "waveform": waveform,
+        "sample_rate": sample_rate,
+        "distribution": conf_dist,
+        "predicted_label": pred_label,
+        "predicted_confidence": pred_conf,
+    }
+    st.session_state["raw_model_output"] = raw_payload
+
+    return {
+        "filename": file_name,
+        "audio_bytes": audio_bytes,
+        "predicted_label": pred_label,
+        "predicted_confidence": float(pred_conf),
+    }
+
+
+def run_chat_inference(user_message: str) -> str:
+    """Run chatbot inference using current emotional context from session state."""
+    emotion = st.session_state.get("current_emotion", "neutral")
+    confidence = float(st.session_state.get("current_confidence", 0.0))
+    history = [{"role": m["role"], "content": m["content"]} for m in st.session_state.get("chat_history", [])]
+
+    # [INSERT LLM INFERENCE HERE]
+    # Replace this block with your own conversational backend if needed.
+    try:
+        from chatbot import full_pipeline
+
+        payload = full_pipeline(
+            voice_emotion=emotion,
+            voice_confidence=confidence,
+            user_message=user_message,
+            history=history,
+        )
+        st.session_state["raw_llm_output"] = payload
+
+        if payload.get("is_crisis"):
+            return str(payload.get("safe_response", "I am here with you."))
+        return str(payload.get("reply", "I am here with you."))
+    except Exception:
+        fallback = (
+            f"I am here with you. I am keeping your current context in mind and can continue from here. "
+            f"(Context: {emotion}, {confidence * 100:.0f}% confidence)"
+        )
+        st.session_state["raw_llm_output"] = {"fallback": True}
+        return fallback
+
+
+init_state()
+predictor = get_predictor_bundle()
+
+
+st.markdown(
+    """
+    <div class="app-title">
+      <h1>EmoSense</h1>
+      <p>Voice-driven emotional context with conversational support in a clean production dashboard.</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+if predictor.is_mock:
+    st.error(
+        f"Model load failed from {MODEL_PATH_DISPLAY}. Running in demo mode. "
+        f"Details are stored internally and hidden from UI."
     )
-    st.info("Tip: Use the Dashboard tab to analyze audio.")
-
-elif page == "About":
-    st.markdown("### About EmoSense AI")
-    st.markdown(
-        "EmoSense AI is a Streamlit interface for Wav2Vec2-based Speech Emotion Recognition on RAVDESS. "
-        f"It supports a strict model path ({MODEL_PATH_DISPLAY}), audio waveform visualization, confidence charts, "
-        "and downloadable mood reports."
-    )
-
 else:
-    st.markdown("### Dashboard")
-    st.markdown(
-        '<div class="soft-note">Tip: Upload or record a short, clear clip (2-6 seconds) for the best prediction quality.</div>',
-        unsafe_allow_html=True,
+    st.success(f"Model checkpoint loaded from {MODEL_PATH_DISPLAY}")
+
+
+left_col, right_col = st.columns([1.02, 1.0], gap="large")
+
+with left_col:
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">🎛️ Input</div>', unsafe_allow_html=True)
+
+    input_mode = st.radio(
+        "Input Mode",
+        options=["Upload File", "Record Voice"],
+        horizontal=True,
+        label_visibility="collapsed",
     )
 
-    predictor = get_predictor_bundle()
-    if predictor.is_mock:
-        st.error(
-            f"Model load failed from {MODEL_PATH_DISPLAY}. "
-            f"Running in demo mode with mock predictions. Details: {predictor.error_message}"
+    uploaded = None
+    recorded_bytes: Optional[bytes] = None
+    recorded_name = f"recorded_{datetime.now().strftime('%H%M%S')}.wav"
+
+    if input_mode == "Upload File":
+        uploaded = st.file_uploader(
+            "Upload Audio",
+            type=["wav", "mp3", "ogg"],
+            help="Supported: .wav, .mp3, .ogg",
         )
     else:
-        st.success(f"Loaded model checkpoint from {MODEL_PATH_DISPLAY}")
-
-    left_col, center_col, right_col = st.columns([1.0, 1.05, 1.35], gap="large")
-
-    with left_col:
-        st.markdown('<div class="panel">', unsafe_allow_html=True)
-        st.subheader("Input Section")
-
-        input_mode = st.radio(
-            "Choose Input Mode",
-            options=["Upload File", "Record Voice"],
-            horizontal=True,
+        recorded_bytes, recorded_name = get_recorded_audio(
+            label="Record Voice",
+            key="dashboard_record_voice",
         )
 
-        uploaded = None
-        recorded_bytes: Optional[bytes] = None
-        recorded_name = f"recorded_{datetime.now().strftime('%H%M%S')}.wav"
+    analyze_clicked = st.button("Analyze Emotion", use_container_width=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-        if input_mode == "Upload File":
-            uploaded = st.file_uploader(
-                "Upload Audio File",
-                type=["wav", "mp3", "ogg"],
-                help="Supported formats: .wav, .mp3, .ogg",
-            )
-        else:
-            st.caption("Use your microphone to record a short audio clip.")
-            recorded_bytes, recorded_name = get_recorded_audio()
-
-        analysis_type = st.selectbox(
-            "Analysis Type",
-            ["Full Analysis", "Emotion Only", "Confidence Only"],
-        )
-
-        analyze_clicked = st.button("🎯 Analyze Emotion", use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+with right_col:
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">📈 Analysis</div>', unsafe_allow_html=True)
 
     result = st.session_state.get("analysis_result")
+    if result is None:
+        st.metric("Primary Emotion", "--")
+        st.metric("Confidence", "--")
+        st.progress(0)
+        st.caption("Run analysis to populate emotion context.")
+    else:
+        emotion = str(result["predicted_label"])
+        confidence = float(result["predicted_confidence"])
+        emoji = EMOTION_EMOJI.get(emotion, "🎧")
 
-    if analyze_clicked:
-        file_name = ""
-        audio_bytes: Optional[bytes] = None
+        st.metric("Primary Emotion", f"{emoji} {emotion.capitalize()}")
+        st.metric("Confidence", f"{confidence * 100:.1f}%")
+        st.progress(min(max(confidence, 0.0), 1.0))
+        st.caption(f"Audio source: {result['filename']}")
 
-        if uploaded is not None:
-            file_name = uploaded.name
-            audio_bytes = uploaded.getvalue()
-        elif recorded_bytes is not None:
-            file_name = recorded_name
-            audio_bytes = recorded_bytes
+    st.markdown("</div>", unsafe_allow_html=True)
 
-        if audio_bytes is None:
-            st.error("Please upload or record an audio clip before analysis.")
-        else:
+
+if analyze_clicked:
+    file_name = ""
+    audio_bytes: Optional[bytes] = None
+
+    if uploaded is not None:
+        file_name = uploaded.name
+        audio_bytes = uploaded.getvalue()
+    elif recorded_bytes is not None:
+        file_name = recorded_name
+        audio_bytes = recorded_bytes
+
+    if audio_bytes is None:
+        st.error("Please upload or record audio before analyzing.")
+    else:
+        with st.spinner("Processing..."):
             try:
-                with st.spinner("Analyzing emotion..."):
-                    waveform, sample_rate = load_audio_from_upload(file_name, audio_bytes)
-                    conf_dist = predict_distribution(waveform, sample_rate, predictor)
-                    pred_label, pred_conf = top_prediction(conf_dist)
+                analyzed = run_emotion_inference(file_name, audio_bytes, predictor)
+                st.session_state["analysis_result"] = analyzed
+                st.session_state["current_emotion"] = analyzed["predicted_label"]
+                st.session_state["current_confidence"] = float(analyzed["predicted_confidence"])
+                st.session_state["chat_opened"] = False
+                st.rerun()
+            except Exception:
+                st.error("Audio processing failed. Please try a different clip.")
 
-                    result = {
-                        "filename": file_name,
-                        "audio_bytes": audio_bytes,
-                        "waveform": waveform,
-                        "sample_rate": sample_rate,
-                        "distribution": conf_dist,
-                        "predicted_label": pred_label,
-                        "predicted_confidence": pred_conf,
-                        "analysis_type": analysis_type,
-                        "timestamp": datetime.now().isoformat(timespec="seconds"),
-                    }
-                    st.session_state["analysis_result"] = result
-            except Exception as exc:
-                st.error(f"Could not analyze audio. {exc}")
 
-    with center_col:
-        st.markdown('<div class="panel">', unsafe_allow_html=True)
-        st.subheader("Emotion Result")
+st.markdown('<div class="chat-wrap">', unsafe_allow_html=True)
+st.markdown("### 💬 Chat")
 
-        if result is None:
-            st.info("Run an analysis to see emotion results here.")
-        else:
-            label = result["predicted_label"]
-            conf = float(result["predicted_confidence"])
-            emoji = EMOTION_EMOJI.get(label, "🎧")
+ctx_emotion = st.session_state.get("current_emotion", "neutral")
+ctx_conf = float(st.session_state.get("current_confidence", 0.0))
+ctx_emoji = EMOTION_EMOJI.get(str(ctx_emotion), "🎧")
+st.markdown(
+    f'<div class="context-chip">Context: {ctx_emoji} {str(ctx_emotion).capitalize()} ({ctx_conf * 100:.0f}%)</div>',
+    unsafe_allow_html=True,
+)
 
-            st.markdown(f'<div class="result-emoji">{emoji}</div>', unsafe_allow_html=True)
-            st.markdown(
-                f'<div class="result-label">{label.capitalize()}</div>',
-                unsafe_allow_html=True,
-            )
+if st.session_state.get("analysis_result") is not None and not st.session_state.get("chat_opened", False):
+    # [INSERT OPENING MESSAGE LOGIC HERE]
+    # Keep this block if you want to auto-greet after each fresh analysis.
+    opening = "Hi, I am here with you. Share what is on your mind, and we can take it step by step."
+    append_chat("assistant", opening)
+    st.session_state["chat_opened"] = True
 
-            if result["analysis_type"] != "Emotion Only":
-                st.metric("Confidence", f"{conf * 100:.1f}%")
+for msg in st.session_state["chat_history"]:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
-            if result["analysis_type"] == "Confidence Only":
-                st.caption("Confidence-only mode selected.")
+user_prompt = st.chat_input("Type your message...")
+if user_prompt:
+    append_chat("user", user_prompt)
+    with st.spinner("Processing..."):
+        reply = run_chat_inference(user_prompt)
+    append_chat("assistant", reply)
+    st.rerun()
 
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with right_col:
-        st.markdown('<div class="panel">', unsafe_allow_html=True)
-        st.subheader("Visualizations")
-
-        if result is None:
-            st.info("Upload/record audio and click Analyze to see charts.")
-        else:
-            if result["analysis_type"] != "Emotion Only":
-                fig = distribution_chart(result["distribution"], result["predicted_label"])
-                st.plotly_chart(fig, use_container_width=True)
-
-            st.audio(result["audio_bytes"], format="audio/wav")
-            wf_fig = waveform_figure(result["waveform"], result["sample_rate"])
-            st.pyplot(wf_fig, clear_figure=True)
-            st.caption("Waveform of uploaded audio")
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with st.expander("📋 Mood Report", expanded=bool(result)):
-        if result is None:
-            st.info("Analyze audio to generate a mood report.")
-        else:
-            report_payload = build_mood_report(
-                predicted_emotion=result["predicted_label"],
-                confidence=float(result["predicted_confidence"]),
-                filename=result["filename"],
-                distribution=result["distribution"],
-            )
-            json_blob, txt_blob = make_report_downloads(report_payload)
-
-            st.markdown("### Summary")
-            st.write(
-                {
-                    "predicted_emotion": report_payload["predicted_emotion"],
-                    "confidence_percent": report_payload["confidence_percent"],
-                    "timestamp": report_payload["timestamp"],
-                    "audio_filename": report_payload["audio_filename"],
-                }
-            )
-
-            if float(result["predicted_confidence"]) > 0.80:
-                st.markdown('<span class="badge-ok">✅ Looks Good!</span>', unsafe_allow_html=True)
-            else:
-                st.markdown('<span class="badge-warn">⚠️ Low Confidence</span>', unsafe_allow_html=True)
-
-            c1, c2 = st.columns(2)
-            with c1:
-                st.download_button(
-                    label="Download report (.json)",
-                    data=json_blob,
-                    file_name="mood_report.json",
-                    mime="application/json",
-                    use_container_width=True,
-                )
-            with c2:
-                st.download_button(
-                    label="Download report (.txt)",
-                    data=txt_blob,
-                    file_name="mood_report.txt",
-                    mime="text/plain",
-                    use_container_width=True,
-                )
+st.markdown("</div>", unsafe_allow_html=True)

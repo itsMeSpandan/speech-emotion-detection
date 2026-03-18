@@ -53,25 +53,65 @@ If you only want to run the app environment:
 pip install -r emosense_app/requirements.txt
 ```
 
-## Dataset
+## Setup Secrets
 
-Place RAVDESS in this structure:
+Use a Hugging Face access token for chatbot calls.
 
-```text
-data/
-  Actor_01/
-  Actor_02/
-  ...
-  Actor_24/
+Get your token from:
+- https://huggingface.co/settings/tokens
+
+For local development:
+1. Copy `.env.example` to `.env`.
+2. Set your value in `.env`:
+
+```env
+HF_TOKEN=your_huggingface_token_here
 ```
 
-Example filename:
+Security rules:
+- Never commit `.env`.
+- Never commit `.streamlit/secrets.toml` with real credentials.
 
-```text
-03-01-05-01-02-01-12.wav
+For Streamlit Cloud deployment:
+- Configure `HF_TOKEN` in `.streamlit/secrets.toml` (or Streamlit Cloud Secrets manager).
+
+## Datasets for Fine-Tuning
+
+This project can be fine-tuned using these speech-emotion datasets:
+
+- CREMA-D: Kaggle dataset `ejlok1/cremad`
+- RAVDESS: Kaggle dataset `uwrfkaggler/ravdess-emotional-speech-audio`
+- SAVEE: Kaggle dataset `barelydedicated/savee-database`
+
+Download method (Kaggle API):
+
+1. Prompt the user to upload `kaggle.json` once at the top of the dataset download section.
+2. Use `kaggle.api.dataset_download_files(..., unzip=True)` for each dataset.
+
+Expected download destinations:
+
+- CREMA-D -> `/content/data/CREMA-D/`
+- RAVDESS -> `/content/data/RAVDESS/`
+- SAVEE -> `/content/data/SAVEE/`
+
+Example Colab snippet:
+
+```python
+from google.colab import files
+import os
+import kaggle
+
+print("Upload kaggle.json")
+files.upload()
+
+os.makedirs("/root/.kaggle", exist_ok=True)
+os.system("mv kaggle.json /root/.kaggle/kaggle.json")
+os.system("chmod 600 /root/.kaggle/kaggle.json")
+
+kaggle.api.dataset_download_files("ejlok1/cremad", path="/content/data/CREMA-D", unzip=True)
+kaggle.api.dataset_download_files("uwrfkaggler/ravdess-emotional-speech-audio", path="/content/data/RAVDESS", unzip=True)
+kaggle.api.dataset_download_files("barelydedicated/savee-database", path="/content/data/SAVEE", unzip=True)
 ```
-
-The third field is emotion id (`01` to `08`).
 
 ## Train Locally
 
@@ -130,9 +170,58 @@ Features in the app:
 - Waveform visualization
 - Downloadable mood report (`.json` / `.txt`)
 
+## Chatbot Integration
+
+The Streamlit app now includes an emotion-aware chatbot powered by Hugging Face Inference API.
+
+- Chat model: `Qwen/Qwen2.5-7B-Instruct`
+- Chat helper module: `emosense_app/chatbot.py`
+- API client: `huggingface_hub.InferenceClient`
+
+Set your Hugging Face token before launching Streamlit:
+
+PowerShell:
+
+```powershell
+$env:HF_TOKEN="your_hf_token_here"
+streamlit run emosense_app/app.py
+```
+
+Bash:
+
+```bash
+export HF_TOKEN="your_hf_token_here"
+streamlit run emosense_app/app.py
+```
+
+Chat input modes in the dashboard:
+
+- `⌨️ Type`: standard text chat (`st.chat_input`)
+- `🎙️ Speak`: in-chat microphone capture; message is transcribed with Whisper (`openai/whisper-base`) and re-analyzed for emotion
+- `📎 Upload`: in-chat file upload with support for `.wav`, `.mp3`, `.ogg`, `.txt`, `.pdf`, `.png`, `.jpg`, `.jpeg`
+
+Notes:
+
+- Audio uploaded in chat updates the live emotional context.
+- Text and PDF files are summarized with emotional awareness.
+- Image uploads are acknowledged textually (the selected Qwen model here is text-only).
+- Downloaded mood reports include the chat conversation log.
+
 Model behavior:
 - Default checkpoint path is `outputs/model.pth`
 - If checkpoint load fails, app falls back to demo mode (mock probabilities)
+
+## Methodology, Pitch, and Impact
+
+This project combines multimodal affect understanding (voice + text), intent-aware conversation design, and practical wellbeing support tools in one loop:
+
+- Voice context from Wav2Vec2 emotion recognition
+- Text sentiment and intent routing for conversational strategy
+- Safety-first crisis interception and helpline-first response path
+- Resource recommendation layer tailored by emotion and intent
+
+For a complete write-up, see:
+- `METHODOLOGY.md`
 
 ## Colab Training
 

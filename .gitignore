@@ -3,6 +3,9 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.env
+.streamlit/secrets.toml
+*.pth
 
 # Dataset and training artifacts
 data/
