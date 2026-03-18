@@ -1,0 +1,2 @@
+-r requirements.txt
+-r emosense_app/requirements.txt

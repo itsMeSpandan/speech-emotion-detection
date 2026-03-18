@@ -1,0 +1,2 @@
+EmoSense AI logo placeholder.
+Use text-based logo rendered in app header.

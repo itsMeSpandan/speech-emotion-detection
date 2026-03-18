@@ -1,0 +1,47 @@
+"""Audio loading and waveform plotting helpers for EmoSense AI."""
+
+from __future__ import annotations
+
+import io
+from pathlib import Path
+from typing import Tuple
+
+import librosa
+import librosa.display
+import matplotlib.pyplot as plt
+import numpy as np
+import soundfile as sf
+
+
+def load_audio_from_upload(file_name: str, file_bytes: bytes) -> Tuple[np.ndarray, int]:
+    """Decode uploaded audio bytes into mono waveform and sample rate."""
+    suffix = Path(file_name).suffix.lower()
+    if suffix not in {".wav", ".mp3", ".ogg"}:
+        raise ValueError("Unsupported format. Upload .wav, .mp3, or .ogg.")
+
+    buffer = io.BytesIO(file_bytes)
+
+    try:
+        waveform, sample_rate = sf.read(buffer)
+        if waveform.ndim > 1:
+            waveform = waveform.mean(axis=1)
+        if waveform.size == 0:
+            raise ValueError("Uploaded audio is empty.")
+        return waveform.astype(np.float32), int(sample_rate)
+    except Exception:
+        # Fallback path for encoded formats unsupported by soundfile in some setups.
+        waveform, sample_rate = librosa.load(io.BytesIO(file_bytes), sr=None, mono=True)
+        if waveform is None or waveform.size == 0:
+            raise ValueError("Could not decode uploaded audio.")
+        return waveform.astype(np.float32), int(sample_rate)
+
+
+def waveform_figure(waveform: np.ndarray, sample_rate: int):
+    """Build a matplotlib figure for waveform display."""
+    fig, ax = plt.subplots(figsize=(8, 2.8))
+    librosa.display.waveshow(waveform, sr=sample_rate, ax=ax, color="#62b0ff")
+    ax.set_title("Waveform of uploaded audio")
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Amplitude")
+    fig.tight_layout()
+    return fig

@@ -1,3 +1,6 @@
+streamlit>=1.30
+plotly>=5.18
+pandas>=2.0
 torch
 torchaudio
 transformers
@@ -8,7 +11,4 @@ scikit-learn
 matplotlib
 seaborn
 tqdm
-streamlit>=1.30
-plotly>=5.18
-pandas>=2.0
 streamlit-audiorecorder
